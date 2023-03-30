@@ -1,0 +1,184 @@
+---
+title: "Does Music affect your mental health?"
+output: pdf_document
+date: "2023-03-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(stringr)
+library(tidyr)
+library(knitr)
+library(tidyverse)
+library(tidyr)
+library(readxl)
+library(readr)
+library(broom)
+library(MASS)
+library(plyr)
+library(lubridate)
+```
+```{r}
+
+data <- read_csv('/Users/sushmithakeerthy/Documents/Working Folder/Indiana University/Semester 4/EDA/mxmh_survey_results.csv')
+```
+
+```{r}
+summary(data)
+```
+```{r}
+colnames(data) <- gsub(" ", "", colnames(data))
+```
+
+
+Keep atributes Age, Hours per day, Instrumentalist, Composer, Favgenre, Frequency..Classical, Frequency..pop, Frequency..Rock, Anxiety, Depression, Music effects
+
+```{r}
+df <- subset(data, select = c("Age", "Hoursperday", "Instrumentalist", "Composer", "Favgenre", "Frequency[Classical]", "Frequency[Pop]", "Frequency[Rock]", "Anxiety", "Depression", "Musiceffects"))
+head(df)
+
+```
+
+
+## Remove Null values
+```{r}
+df <- subset(df, Musiceffects != '')
+str(df$Musiceffects)
+```
+
+## Check for outliers
+```{r}
+ggplot(df,aes(x = Age))+geom_boxplot()
+summary(df$Age)
+```
+```{r}
+ggplot(df,aes(x = Hoursperday))+geom_boxplot()
+summary(df$Hoursperday)
+```
+```{r}
+df1<- subset(df, Age<=70 & Hoursperday<=8)
+ggplot(df1,aes(x = Age))+geom_boxplot()
+ggplot(df1,aes(x = Hoursperday))+geom_boxplot()
+summary(df1$Hoursperday)
+summary(df1$Age)
+head(df1)
+```
+```{r}
+ggplot(df1, aes(x = Age)) + geom_histogram(binwidth = 3, fill = 'lightpink', color = 'white') + labs(title = "Age distribution")
+```
+
+```{r}
+ggplot(df1, aes(x = Hoursperday)) + geom_histogram(binwidth = 1, fill = "palegoldenrod", colour = "black") + labs(title = "Hours of Music listened to daily")
+
+```
+# Is there a relationship between the number of hours listened to music with age?
+```{r}
+ggplot(data = df1, aes( x = Anxiety, y = Hoursperday)) + geom_smooth (method = 'loess', colour = "goldenrod")+
+  ggtitle("How does the duration of listening to music affect mental health scores?")
+
+```
+
+```{r}
+genre_count = dplyr::count(df1, Favgenre, sort = TRUE)
+ggplot(genre_count, aes(x = Favgenre, y = n)) +
+  geom_bar(stat = "identity", fill = "lightpink", color = 'black') +
+  xlab("Favorite Genre") +
+  ylab("Number of Respondents") +
+  ggtitle("Distribution of Favorite Music Genres")+ theme(axis.text.x = element_text(angle = 90))
+```
+```{r}
+Composer_count = dplyr::count(df1, Composer, sort = TRUE)
+Instrumentalist_count = dplyr::count(df1, Instrumentalist, sort = TRUE)
+Composer_count
+Instrumentalist_count
+```
+```{r}
+Depression_spread = dplyr::count(df1, Depression, sort = TRUE)
+ggplot(Depression_spread, aes(x = Depression, y = n)) +
+  geom_bar(stat = "identity", fill = "lightpink") +
+  xlab("Self Reported Depression rank") +
+  ylab("Number of Respondents") +
+  ggtitle("Distribution of Depression")+ theme(axis.text.x = element_text(angle = 90))
+
+ggplot(df1, aes(x = Depression)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "lightpink") +
+  labs(x = "Depression", y = "Count", title = "Distribution of Depression")
+
+ggplot(df1, aes(x = Anxiety)) +
+  geom_histogram(binwidth = 1, color = "black", fill = "palegoldenrod") +
+  labs(x = "Anxiety", y = "Count", title = "Distribution of Anxiety")
+
+```
+```{r}
+ggplot(df1, aes(x = Age, y = Favgenre, color = Favgenre)) +
+    geom_violin() + coord_flip() +  ggtitle("How does age impact the genre of music?")+ theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+ggplot(df1, aes(x = Age, y = Musiceffects, color = Musiceffects)) +
+    geom_jitter(width = 0, height = 0.2)+ scale_color_manual(values=c('pink2', 'lightgoldenrod', 'wheat3')) + ggtitle("How does age impact the effect of music?")
+```
+
+```{r}
+ggplot(df1, aes(x = Hoursperday, fill = Musiceffects)) +
+    geom_density(position = "fill") + scale_fill_manual(values=c('pink', 'palegoldenrod', 'wheat1'))+
+    ggtitle("How does music affect a person based on the number of hours they listen per day?")
+```
+# Particular kinds of music relating to anxiety and depression
+```{r}
+classical = dplyr::count(df1,`Frequency[Classical]`, sort = TRUE)
+classical
+
+```
+
+
+```{r}
+ggplot(df1, aes(x = Depression, fill = `Frequency[Classical]`)) +
+    geom_density(position = "stack") + scale_fill_manual(values=c('pink', 'palegoldenrod', 'wheat1','white'))+
+    ggtitle("How does classical music affect a persons depression rate?")
+```
+
+```{r}
+library(MASS)
+depression.polr = polr(as.factor (`Frequency[Pop]`) ~ Depression, data = df1)
+library(arm)
+display(depression.polr)
+```
+
+```{r}
+Depression = seq(min(df1$Depression), max(df1$Depression), 1)
+pop.probs = predict(depression.polr, newdata = data.frame(Depression), type = "prob")
+pop.probs.df = data.frame(Depression, pop.probs)
+names(pop.probs.df) = c("Depression", "Never", "Rarely", "Sometimes", "Very frequently")
+library(tidyr)
+pop.probs.long = pop.probs.df %>% gather(`Frequency[Pop]`, Probability, 2:5)
+pop.probs.long$`Frequency[Pop]` = factor(pop.probs.long$`Frequency[Pop]`, levels = c("Never", "Rarely", "Sometimes", "Very frequently"), ordered = TRUE)
+ggplot(pop.probs.long, aes(x = Depression, y = Probability, group = `Frequency[Pop]`, color = `Frequency[Pop]`)) +
+    geom_line() +
+    ggtitle("How does Pop music affect depression among different groups of individuals?")
+
+```
+```{r}
+Anxiety.polr = polr(as.factor (`Frequency[Pop]`) ~ Anxiety, data = df1)
+display(Anxiety.polr)
+
+Anxiety = seq(min(df1$Anxiety), max(df1$Anxiety), 1)
+pop.probs = predict(Anxiety.polr, newdata = data.frame(Anxiety), type = "prob")
+pop.probs.df = data.frame(Anxiety, pop.probs)
+names(pop.probs.df) = c("Anxiety", "Never", "Rarely", "Sometimes", "Very frequently")
+library(tidyr)
+pop.probs.long = pop.probs.df %>% gather(`Frequency[Pop]`, Probability, 2:5)
+pop.probs.long$`Frequency[Pop]` = factor(pop.probs.long$`Frequency[Pop]`, levels = c("Never", "Rarely", "Sometimes", "Very frequently"), ordered = TRUE)
+ggplot(pop.probs.long, aes(x = Anxiety, y = Probability, group = `Frequency[Pop]`, color = `Frequency[Pop]`)) +
+    geom_line() +
+    ggtitle("How does Pop music affect Anxiety among different groups of individuals?")
+
+```
+
